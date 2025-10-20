@@ -4,7 +4,7 @@ name: Sync Fork
 on:
   schedule:
     - cron: '0 0 * * *'  # 每天 UTC 0 点同步（北京时间 8 点）
-  workflow_dispatch:      # 允许手动触发
+  workflow_dispatch:      # 可以手动触发
 
 jobs:
   sync:
@@ -37,8 +37,6 @@ jobs:
     - name: Merge upstream
       run: git merge upstream/main --allow-unrelated-histories
 
-    # 6️⃣ Push 合并后的内容到 fork 仓库
+    # 6️⃣ Push 合并后的内容到 fork 仓库（使用 token 避免权限问题）
     - name: Push changes
-      run: git push origin main
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/xiaosahuogui/MoonTV.git main
