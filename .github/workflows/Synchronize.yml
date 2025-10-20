@@ -1,34 +1,44 @@
 name: Sync Fork
 
+# 触发条件
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天 UTC 时间 0 点同步
-  workflow_dispatch: # 可以手动触发
+    - cron: '0 0 * * *'  # 每天 UTC 0 点同步（北京时间 8 点）
+  workflow_dispatch:      # 允许手动触发
 
 jobs:
   sync:
     runs-on: ubuntu-latest
 
     steps:
+    # 1️⃣ Checkout 仓库
     - name: Checkout
       uses: actions/checkout@v3
       with:
-        ref: main
+        ref: main             # 如果你的默认分支不是 main，请修改
         persist-credentials: false
+        token: ${{ secrets.GITHUB_TOKEN }}
 
+    # 2️⃣ 配置 Git 用户信息
     - name: Set up Git
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
+    # 3️⃣ 添加 upstream 仓库
     - name: Add upstream
       run: git remote add upstream https://github.com/Stardm0/MoonTV.git
 
+    # 4️⃣ 获取 upstream 最新内容
     - name: Fetch upstream
       run: git fetch upstream
 
+    # 5️⃣ 合并 upstream 到本地 main 分支
     - name: Merge upstream
       run: git merge upstream/main --allow-unrelated-histories
 
+    # 6️⃣ Push 合并后的内容到 fork 仓库
     - name: Push changes
       run: git push origin main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
