@@ -30,6 +30,7 @@ import { getRequestTimeout, getVideoResolutionFromM3u8 } from '@/lib/utils';
 
 import DanmakuSelector from '@/components/DanmakuSelector';
 import EpisodeSelector from '@/components/EpisodeSelector';
+import { triggerGlobalError } from '@/components/GlobalErrorIndicator';
 import PageLayout from '@/components/PageLayout';
 
 // 扩展 HTMLVideoElement 类型以支持 hls 属性
@@ -179,48 +180,20 @@ function PlayPageClient() {
   useEffect(() => {
     if (!selectedDanmakuAnime || !detail || !isDanmakuPluginReady) return;
   
-    const currentEpisode = currentEpisodeIndex + 1;
     const currentEpisodeTitle = detail?.episodes_titles?.[currentEpisodeIndex];
     if (!currentEpisodeTitle) return;
-  
-    const extractedNumber = extractEpisodeNumber(currentEpisodeTitle);
   
     let matchedEpisode: any = null;
   
     /** ① 用户手动选择某一集（权重大最高） */
     if (selectedDanmakuEpisode !== undefined && selectedState) {
       matchedEpisode = selectedDanmakuAnime.episodes[selectedDanmakuEpisode - 1];
-      setAutoDanmakuEnabled(false);
       setSelectedState(false);
     }
   
     /** ② 自动匹配模式：直接使用第 0 集 */
     else if (autoDanmakuEnabled) {
       matchedEpisode = selectedDanmakuAnime.episodes[0];
-    }
-  
-    /** ③ 普通模式：标题匹配 → 集数匹配 → 索引兜底 */
-    else {
-      // 1. 完全匹配标题
-      matchedEpisode = selectedDanmakuAnime.episodes.find(
-        (ep) => ep.episodeTitle === currentEpisodeTitle
-      );
-  
-      // 2. 按提取的集数匹配
-      if (!matchedEpisode && extractedNumber !== null) {
-        matchedEpisode = selectedDanmakuAnime.episodes.find((ep) => {
-          const epNumber = extractEpisodeNumber(ep.episodeTitle);
-          return epNumber === extractedNumber;
-        });
-      }
-  
-      // 3. 根据当前索引兜底
-      if (
-        !matchedEpisode &&
-        currentEpisode <= selectedDanmakuAnime.episodes.length
-      ) {
-        matchedEpisode = selectedDanmakuAnime.episodes[currentEpisode - 1];
-      }
     }
   
     if (!matchedEpisode) return;
@@ -262,6 +235,7 @@ function PlayPageClient() {
     if (!danmukuPluginInstanceRef.current || !danmukuUrl) return;
     try {
       console.log('动态更新弹幕源:', danmukuUrl);
+      danmukuPluginInstanceRef.current.reset();
       danmukuPluginInstanceRef.current.load(danmukuUrl);
     } catch (error) {
       console.error('更新弹幕源失败:', error);
@@ -972,9 +946,12 @@ function PlayPageClient() {
           setSelectedDanmakuAnime(animeOption);
           setSelectedDanmakuSource(platform);
 
+        }else {
+          triggerGlobalError("自动加载弹幕失败，请手动选择弹幕源");
         }
       } catch (err) {
         console.error("初始化自动加载弹幕失败:", err);
+        triggerGlobalError("自动加载弹幕失败，请手动选择弹幕源");
       } finally {
         setIsDanmakuLoading(false);
       }
@@ -1106,14 +1083,6 @@ function PlayPageClient() {
       newUrl.searchParams.set('year', newDetail.year);
       window.history.replaceState({}, '', newUrl.toString());
 
-      // 在更新视频源之前销毁当前播放器实例
-      if (artPlayerRef.current) {
-        if (artPlayerRef.current.video && artPlayerRef.current.video.hls) {
-          artPlayerRef.current.video.hls.destroy();
-        }
-        artPlayerRef.current.destroy();
-        artPlayerRef.current = null;
-      }
 
       setVideoTitle(newDetail.title || newTitle);
       setVideoYear(newDetail.year);
@@ -2167,7 +2136,7 @@ function PlayPageClient() {
                 ></div>
 
                 {/* 弹幕选择器 */}
-                <div style={{ display: showDanmakuSelector ? 'block' : 'none' }}>
+                {showDanmakuSelector && (
                   <DanmakuSelector
                     videoTitle={videoTitle}
                     isVisible={showDanmakuSelector}
@@ -2198,7 +2167,7 @@ function PlayPageClient() {
                       }
                     }}
                   />
-                </div>
+                )}
 
                 {/* 换源加载蒙层 */}
                 {isVideoLoading && (
